@@ -1,7 +1,6 @@
 # build stage
 FROM golang:alpine AS build
 RUN apk --no-cache add build-base git bzr mercurial gcc
-RUN useradd
 ADD . /src/github.com/PumpkinSeed/invoker
 RUN cd /src/github.com/PumpkinSeed/invoker/server/cmd && go build -o invoker-http
 
