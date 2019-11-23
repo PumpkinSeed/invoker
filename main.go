@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
+	"log"
+	"os"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -18,36 +20,61 @@ type settings struct {
 }
 
 func main() {
+	containerArg, commandArg := parseArgs()
 	ctx := context.Background()
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	hc := &http.Client{Transport: tr}
-	cli, err := client.NewClient(client.DefaultDockerHost, client.DefaultVersion, hc, nil)
+	cli, err := client.NewClient(client.DefaultDockerHost, client.DefaultVersion, nil, nil)
 	if err != nil {
 		panic(err)
-
 	}
 
-	containers, err := getContainerIDs(context.Background(), cli, []string{"api_couchbase_1"})
+	s, err := read()
+
+	containers, err := getContainerIDs(context.Background(), cli, s.Containers[containerArg])
 	if err != nil {
 		panic(err)
 	}
 	for _, container := range containers {
-		data, err:= exec(ctx, cli, container)
-		if err != nil {
-			panic(err)
+		if commands, ok := s.Commands[commandArg]; ok {
+			for _, command := range commands {
+				data, err := exec(ctx, cli, container, command)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println(string(data))
+			}
 		}
-		fmt.Println(string(data))
 	}
 	fmt.Println(containers)
 }
 
-func exec(ctx context.Context, cli *client.Client, container string) ([]byte, error) {
+func read() (*settings, error) {
+	path := os.Getenv("INVOKER_SETTINGS")
+	log.Print(path)
+	if path == "" {
+		return nil, errors.New("empty")
+	}
+
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var s settings
+	err = json.Unmarshal(content, &s)
+	return &s, err
+}
+
+func parseArgs() (string, string) {
+	if len(os.Args) != 3 {
+		return "", ""
+	}
+	return os.Args[1], os.Args[2]
+}
+
+func exec(ctx context.Context, cli *client.Client, container string, command string) ([]byte, error) {
 	exec, err := cli.ContainerExecCreate(ctx, container, types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
-		Cmd:          []string{"ls", "-ll"},
+		Cmd:          strings.Split(command, " "),
 	})
 	if err != nil {
 		return nil, err
@@ -55,7 +82,7 @@ func exec(ctx context.Context, cli *client.Client, container string) ([]byte, er
 	resp, err := cli.ContainerExecAttach(ctx, exec.ID, types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
-		Cmd:          []string{"ls", "-ll"},
+		Cmd:           strings.Split(command, " "),
 	})
 	if err != nil {
 		return nil, err
