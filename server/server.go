@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultPort = 3000
+	DefaultPort = 3000
 )
 
 var (
@@ -27,6 +27,8 @@ type Response struct {
 
 type CommandResponse struct {
 	Iteration int `json:"iteration"`
+	Name string `json:"name"`
+	Command string `json:"command"`
 	StdOutput string `json:"std_output"`
 	StdError string `json:"std_error"`
 	Error string `json:"error"`
@@ -44,7 +46,7 @@ type server struct {
 func Serve(s string) {
 	server := server{path: s}
 	http.HandleFunc("/", server.handler)
-	log.Printf("Listening on :%d", defaultPort)
+	log.Printf("Listening on :%d", DefaultPort)
 	if err := http.ListenAndServe(":3000", nil); err != nil {
 		log.Fatal(err)
 	}
@@ -52,6 +54,7 @@ func Serve(s string) {
 
 func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 	commands := strings.Split(r.URL.Path[1:], "/")
+	log.Print(commands)
 	settings, err := readSettings(s.path)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -66,6 +69,7 @@ func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 			for i, actualCommand := range v {
 				cr := run(actualCommand)
 				cr.Iteration = i
+				cr.Name = command
 				resp.CommandResponses = append(resp.CommandResponses, cr)
 			}
 		}
@@ -90,7 +94,9 @@ func readSettings(s string) (*settings, error) {
 }
 
 func run(command string) CommandResponse {
-	var resp = CommandResponse{}
+	var resp = CommandResponse{
+		Command: command,
+	}
 	c := strings.Split(command, " ")
 	if len(c) > 1 {
 		args := c[1:]
