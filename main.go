@@ -2,21 +2,14 @@ package main
 
 import (
 	"flag"
-	"github.com/go-chi/chi"
-	"net/http"
+	"github.com/PumpkinSeed/container-invoke/server"
 )
 
 var (
-	defaultPort = 3000
 	defaultSettingsPath = "/etc/invoker/settings.json"
 
 	settingsPath string
 )
-
-type settings struct {
-	Port int `json:"port"`
-	Commands map[string]string `json:"commands"`
-}
 
 func init() {
 	flag.StringVar(&settingsPath, "settings", defaultSettingsPath, "")
@@ -24,11 +17,7 @@ func init() {
 }
 
 func main() {
-	r := chi.NewRouter()
-	r.Get("/invoke", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome"))
-	})
-	http.ListenAndServe(":3000", r)
+	server.Serve(settingsPath)
 }
 
 
