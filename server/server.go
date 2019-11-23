@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,25 +18,29 @@ const (
 )
 
 var (
+	Version        = 0
+	changeHappened = make(chan bool)
+
 	ErrInvalidCommand = errors.New("command invalid")
 )
 
 type Response struct {
 	CommandResponses []CommandResponse `json:"command_responses"`
-	Error string `json:"error"`
+	Error            string            `json:"error"`
 }
 
 type CommandResponse struct {
-	Iteration int `json:"iteration"`
-	Name string `json:"name"`
-	Command string `json:"command"`
+	Iteration int    `json:"iteration"`
+	Name      string `json:"name"`
+	Command   string `json:"command"`
 	StdOutput string `json:"std_output"`
-	StdError string `json:"std_error"`
-	Error string `json:"error"`
+	StdError  string `json:"std_error"`
+	Error     string `json:"error"`
 }
 
 type settings struct {
-	Port int `json:"port"`
+	Version  int                 `json:"version"`
+	Port     int                 `json:"port"`
 	Commands map[string][]string `json:"commands"`
 }
 
@@ -43,13 +48,43 @@ type server struct {
 	path string
 }
 
-func Serve(s string) {
-	server := server{path: s}
+func Serve(path string) {
+	server := server{path: path}
 	http.HandleFunc("/", server.handler)
-	log.Printf("Listening on :%d", DefaultPort)
-	if err := http.ListenAndServe(":3000", nil); err != nil {
-		log.Fatal(err)
+
+	for {
+		hs := server.serve()
+
+		<-changeHappened
+		log.Print("Change happened")
+
+		if err := hs.Shutdown(context.Background()); err != nil {
+			log.Print(err)
+		}
 	}
+}
+
+func (s *server) serve() *http.Server {
+	log.Printf("Listening on %s", s.addr())
+	hs := &http.Server{Addr: s.addr()}
+	go func() {
+		if err := hs.ListenAndServe(); err != nil {
+			log.Print(err)
+		}
+	}()
+
+	return hs
+}
+
+func (s *server) addr() string {
+	settings, err := readSettings(s.path)
+	if err != nil {
+		return fmt.Sprintf(":%d", DefaultPort)
+	}
+	if settings.Port < 1024 {
+		return fmt.Sprintf(":%d", DefaultPort)
+	}
+	return fmt.Sprintf(":%d", settings.Port)
 }
 
 func (s *server) handler(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +97,13 @@ func (s *server) handler(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(resp)
 		return
 	}
+
+	defer func() {
+		if settings.Version != Version {
+			Version = settings.Version
+			changeHappened <- true
+		}
+	} ()
 
 	var resp Response
 	for _, command := range commands {
