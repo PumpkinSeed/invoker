@@ -1,73 +1,93 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
+	"context"
+	"crypto/tls"
 	"fmt"
-	"github.com/PumpkinSeed/container-invoke/server"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
-var (
-	host string
-	port int
-	commands string
-)
-
-func init() {
-	flag.StringVar(&host, "host", "localhost", "")
-	flag.IntVar(&port, "port", server.DefaultPort, "")
-	flag.StringVar(&commands, "commands", "", "")
-	flag.Parse()
+type settings struct {
+	Containers map[string][]string `json:"containers"`
+	Commands   map[string][]string `json:"commands"`
 }
 
 func main() {
-	resp, err := http.Get(geturl())
+	ctx := context.Background()
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	hc := &http.Client{Transport: tr}
+	cli, err := client.NewClient(client.DefaultDockerHost, client.DefaultVersion, hc, nil)
 	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer resp.Body.Close()
+		panic(err)
 
-	if resp.StatusCode == http.StatusOK {
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		print(bodyBytes)
-	} else {
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println(string(bodyBytes))
 	}
+
+	containers, err := getContainerIDs(context.Background(), cli, []string{"api_couchbase_1"})
+	if err != nil {
+		panic(err)
+	}
+	for _, container := range containers {
+		data, err:= exec(ctx, cli, container)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(data))
+	}
+	fmt.Println(containers)
 }
 
-func print(data []byte) {
-	var response server.Response
-	if err := json.Unmarshal(data, &response); err != nil {
-		log.Fatal(err)
+func exec(ctx context.Context, cli *client.Client, container string) ([]byte, error) {
+	exec, err := cli.ContainerExecCreate(ctx, container, types.ExecConfig{
+		AttachStderr: true,
+		AttachStdout: true,
+		Cmd:          []string{"ls", "-ll"},
+	})
+	if err != nil {
+		return nil, err
 	}
-	if response.Error != "" {
-		fmt.Println(response.Error)
-		return
+	resp, err := cli.ContainerExecAttach(ctx, exec.ID, types.ExecConfig{
+		AttachStderr: true,
+		AttachStdout: true,
+		Cmd:          []string{"ls", "-ll"},
+	})
+	if err != nil {
+		return nil, err
 	}
-	for _, cr := range response.CommandResponses {
-		fmt.Printf("%s>%d: %s\n",cr.Name, cr.Iteration,  cr.Command)
-		if cr.Error != "" {
-			fmt.Println(cr.Error)
-			continue
-		}
-		fmt.Print(cr.StdOutput)
-		fmt.Print(cr.StdError)
+	data, err := ioutil.ReadAll(resp.Reader)
+	if err != nil {
+		return nil, err
 	}
+
+	return data, nil
 }
 
-func geturl() string {
-	urlpath := strings.Replace(commands, ",", "/", -1)
-	return fmt.Sprintf("http://%s:%d/%s", host, port, urlpath)
+func getContainerIDs(ctx context.Context, cli *client.Client, containers []string) ([]string, error) {
+	images, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []string
+	for _, img := range images {
+		for _, name := range img.Names {
+			for _, container := range containers {
+				if container == removePrefix(name) {
+					ids = append(ids, img.ID)
+				}
+			}
+		}
+	}
+
+	return ids, nil
+}
+
+func removePrefix(name string) string {
+	return strings.Replace(name, "/", "", -1)
 }
