@@ -1,4 +1,4 @@
-module github.com/PumpkinSeed/container-invoke
+module github.com/PumpkinSeed/invoker
 
 go 1.13
 
