@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	EnvPrefix = "INVOKER_"
+	envPrefix = "INVOKER_"
 
-	EnvVerbose = EnvPrefix+"VERBOSE"
-	EnvSkipOutput = EnvPrefix+"SKIP_OUTPUT"
-	EnvSettings = EnvPrefix+"SETTINGS"
+	envVerbose    = envPrefix + "VERBOSE"
+	envSkipOutput = envPrefix + "SKIP_OUTPUT"
+	envSettings   = envPrefix + "SETTINGS"
 )
 
 type settings struct {
@@ -54,7 +54,7 @@ func main() {
 }
 
 func printOutput(container containerDef, command, data string) {
-	if skip, ok := os.LookupEnv(EnvSkipOutput); ok && skip == "true" {
+	if skip, ok := os.LookupEnv(envSkipOutput); ok && skip == "true" {
 		return
 	}
 	fmt.Printf("%s [%s] ~ %s\n", removePrefix(container.name), container.id, command)
@@ -62,7 +62,7 @@ func printOutput(container containerDef, command, data string) {
 }
 
 func read() *settings {
-	path := os.Getenv(EnvSettings)
+	path := os.Getenv(envSettings)
 	if path == "" {
 		verboseLog(fmt.Sprintf("%s", "error: settings path is empty, set INVOKER_SETTINGS with the path of settings file"), Fatal)
 		return nil
@@ -104,7 +104,7 @@ func exec(ctx context.Context, cli *client.Client, container string, command str
 	resp, err := cli.ContainerExecAttach(ctx, exec.ID, types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
-		Cmd:           strings.Split(command, " "),
+		Cmd:          strings.Split(command, " "),
 	})
 	if err != nil {
 		verboseLog(fmt.Sprintf("%s [%s]", "error: attach exec to container", err.Error()), Fatal)
@@ -120,7 +120,7 @@ func exec(ctx context.Context, cli *client.Client, container string, command str
 }
 
 type containerDef struct {
-	id string
+	id   string
 	name string
 }
 
@@ -157,7 +157,7 @@ const (
 )
 
 func verboseLog(str string, level int) {
-	if verbose, ok := os.LookupEnv(EnvVerbose); ok && verbose != "true" {
+	if verbose, ok := os.LookupEnv(envVerbose); ok && verbose != "true" {
 		return
 	} else if !ok {
 		return
