@@ -6,6 +6,10 @@ The main concept behind the solution is simplify and make faster command executi
 
 #### Usage
 
+```
+go install github.com/PumpkinSeed/invoker
+```
+
 Create settings.json and move to a common location
 
 ```
