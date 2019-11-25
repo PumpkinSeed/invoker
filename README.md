@@ -1,5 +1,7 @@
 # Invoker
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/PumpkinSeed/invoker)](https://goreportcard.com/report/github.com/PumpkinSeed/invoker)
+
 #### Run pre-defined commands inside your container/containers.
 
 The main concept behind the solution is simplify and make faster command executions in docker containers.

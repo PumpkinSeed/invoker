@@ -28,12 +28,12 @@ type settings struct {
 
 func main() {
 	containerArg, commandArg := parseArgs()
-	verboseLog(fmt.Sprintf("invoker starts to execute {%s} command group on {%s} container group", commandArg, containerArg), Info)
+	verboseLog(fmt.Sprintf("invoker starts to execute {%s} command group on {%s} container group", commandArg, containerArg), info)
 
 	ctx := context.Background()
 	cli, err := client.NewEnvClient()
 	if err != nil {
-		verboseLog(fmt.Sprintf("%s [%s]", "error: creating Docker client connection", err.Error()), Fatal)
+		verboseLog(fmt.Sprintf("%s [%s]", "error: creating Docker client connection", err.Error()), fatal)
 		return
 	}
 
@@ -64,20 +64,20 @@ func printOutput(container containerDef, command, data string) {
 func read() *settings {
 	path := os.Getenv(envSettings)
 	if path == "" {
-		verboseLog(fmt.Sprintf("%s", "error: settings path is empty, set INVOKER_SETTINGS with the path of settings file"), Fatal)
+		verboseLog(fmt.Sprintf("%s", "error: settings path is empty, set INVOKER_SETTINGS with the path of settings file"), fatal)
 		return nil
 	}
 
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		verboseLog(fmt.Sprintf("%s %s [%s]", "error: reading the file on path", path, err.Error()), Fatal)
+		verboseLog(fmt.Sprintf("%s %s [%s]", "error: reading the file on path", path, err.Error()), fatal)
 		return nil
 	}
 
 	var s settings
 	err = json.Unmarshal(content, &s)
 	if err != nil {
-		verboseLog(fmt.Sprintf("%s [%s]", "error: marshal the file content to settings", err.Error()), Fatal)
+		verboseLog(fmt.Sprintf("%s [%s]", "error: marshal the file content to settings", err.Error()), fatal)
 		return nil
 	}
 	return &s
@@ -97,7 +97,7 @@ func exec(ctx context.Context, cli *client.Client, container string, command str
 		Cmd:          strings.Split(command, " "),
 	})
 	if err != nil {
-		verboseLog(fmt.Sprintf("%s [%s]", "error: create exec in container", err.Error()), Fatal)
+		verboseLog(fmt.Sprintf("%s [%s]", "error: create exec in container", err.Error()), fatal)
 		return nil
 	}
 
@@ -107,12 +107,12 @@ func exec(ctx context.Context, cli *client.Client, container string, command str
 		Cmd:          strings.Split(command, " "),
 	})
 	if err != nil {
-		verboseLog(fmt.Sprintf("%s [%s]", "error: attach exec to container", err.Error()), Fatal)
+		verboseLog(fmt.Sprintf("%s [%s]", "error: attach exec to container", err.Error()), fatal)
 		return nil
 	}
 	data, err := ioutil.ReadAll(resp.Reader)
 	if err != nil {
-		verboseLog(fmt.Sprintf("%s [%s]", "error: parse the response", err.Error()), Fatal)
+		verboseLog(fmt.Sprintf("%s [%s]", "error: parse the response", err.Error()), fatal)
 		return nil
 	}
 
@@ -152,8 +152,8 @@ func removePrefix(name string) string {
 }
 
 const (
-	Info = iota
-	Fatal
+	info = iota
+	fatal
 )
 
 func verboseLog(str string, level int) {
@@ -164,9 +164,9 @@ func verboseLog(str string, level int) {
 	}
 
 	switch level {
-	case Info:
+	case info:
 		log.Printf("[%s] %s", "INFO", str)
-	case Fatal:
+	case fatal:
 		log.Printf("[%s] %s", "FATAL", str)
 		os.Exit(1)
 	}
